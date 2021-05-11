@@ -23,7 +23,14 @@ class Spot:
     def __init__(self):
         self.state = "EMPTY"
         self.occupant = None
-    
+    def occupy(self, new_occupant):
+        #OCCUPY SPOT WITH NEW PIECE
+        self.occupant = new_occupant
+        self.state = "FULL"
+    def empty(self):
+        #CLEAR SPOT
+        self.occupant = None
+        self.state = "EMPTY"
     def get_ascii(self):
         if self.state == "EMPTY":
             return "__"
@@ -93,6 +100,10 @@ class Board:
         #TAKES TWO CHESS POSITIONS AND MOVES THE PIECE AT 'START' TO OCCUPY 'END'
         #THIS DOES NOT HANDLE VALIDATION BY CHECKING WHETHER OR NOT THE MOVE IS LEGAL.
         #THAT WILL BE CHECKED WITH ANOTHER FUNCTION BEFORE THIS ONE IS CALLED.
+        start_spot = self.get_position(start)
+        end_spot = self.get_position(end)
+        end_spot.occupy(start_spot.occupant)
+        start_spot.empty()
         pass
 
 
@@ -101,3 +112,5 @@ board.setup_board()
 board.print_board()
 print(board.translate_position("E7"))
 print(board.get_position("E7").get_ascii())
+board.move("H7", "H4")
+board.print_board()
