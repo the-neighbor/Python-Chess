@@ -3,32 +3,53 @@ import piece_moves
 
 validate_coordinates = piece_moves.validate_coordinates
 
+#POSITION CLASS STORES A GIVEN POSITION ON THE CHESS BOARD
+#WHEN INITIALIZED, IT TAKES IN A POSITION AS EITHER A PAIR OF COORDINATES
+#OR AS A STRING CONTAINING A BOARD POSITION IN CHESS NOTATION
+#AND IT THEN CONVERTS THIS INTO AN OBJECT WHICH CONTAINS BOTH
+#THE CHESS NOTATION OF THE POSITION AND A 2D VECTOR WITH THE POSITION COORDINATES
+#THIS MAKES IT EASIER TO HANDLE CONVERSIONS BETWEEN THE TWO
+#AND FACILITATES THE USE OF VECTOR OPERATIONS LIKE ADDITION AND MULTIPLICATION
+#TO EASILY CALCULATE NEW BOARD POSITIONS FROM A STARTING POSITION AND A MOVEMENT VECTOR
 class Position:
     def __init__(self, position):
         XVALUES = list("ABCDEFGH")
         YVALUES = list("87654321")
+        self.chess_notation = ""
+        self.vector = numpy.array([-1,-1])
         if isinstance(position, str):
             #POSITION CAN BE PROVIDED AS A STRING LIKE "A2"
             position = position.upper()
-            self.chess_notation = position
-            x = XVALUES.index(position[0])
-            y = YVALUES.index(position[1])
-            self.vector = numpy.array([x,y])
-        elif isinstance(position, (numpy.ndarray)):
+            if position[0] in XVALUES and position[1] in YVALUES:
+                self.chess_notation = position
+                x = XVALUES.index(position[0])
+                y = YVALUES.index(position[1])
+                self.vector = numpy.array([x,y])
+        elif isinstance(position, (numpy.ndarray, list)):
             #POSITION CAN ALSO BE PROVIDED AS A VECTOR(NUMPY ARRAY)
-            self.vector = position.copy()
-            chess_notation = ""
-            chess_notation += XVALUES[self.vector[0]]
-            chess_notation += YVALUES[self.vector[1]]
-            self.chess_notation = chess_notation
+            if position[0] in range(0,8) and position[1] in range(0,8): 
+                self.vector = position.copy()
+                chess_notation = ""
+                chess_notation += XVALUES[self.vector[0]]
+                chess_notation += YVALUES[self.vector[1]]
+                self.chess_notation = chess_notation
     def print(self):
+        #PRINT BOTH FORMS OF THE NOTATION TO STDOUT
         print(self.chess_notation)
         print(self.vector)
     def add_move(self, movement_vector):
+        #USE THE VECTOR ADDITION PROVIDED BY NUMPY TO RETURN THE POSITION
+        #YOU WOULD ARRIVE AT IF YOU FOLLOWED SOME MOVEMENT VECTOR FROM THIS ONE.
         if not isinstance(movement_vector, numpy.ndarray):
             movement_vector = numpy.array(movement_vector)
         return Position(self.vector + movement_vector)
 
+
+#PIECE CLASS STORES THE ATTRIBUTES OF A PARTICULAR PIECE. IT IS RESPONSIBLE FOR
+#STORING WHAT KIND OF CHESS PIECE IT IS, AS WELL AS THE COLOR, AND USING THAT
+#TO DETERMINE WHAT POTENTIAL MOVES CAN BE MADE FROM A GIVEN BOARD POSITION.
+#IN OUR CASE, WE CURRENTLY USE THE PIECE CLASS TO STORE AND PRINT THE ASCII
+#REPRESENTATION THAT CORROSPONDS TO THAT PIECE
 class Piece:
     ascii = {
         'PAWN':"P",
@@ -38,7 +59,8 @@ class Piece:
         'KING':"K",
         'QUEEN':"Q"
     }
-    def __init__(self, color="WHITE", piece="PAWN"):
+    def __init__(self, board, color="WHITE", piece="PAWN"):
+        self.board = board
         self.color = color
         self.piece = piece
         self.piece_moves = piece_moves.move_methods[self.piece]
@@ -52,6 +74,7 @@ class Piece:
     def eval_moves(self, position):
         #REFACTOR THE EVAL
         moves = self.piece_moves()
+        print(moves)
         return_moves = {"moves":[], "captures":[]}
         for m in moves["moves"]:
             #CREATE A COPY OF THE ORIGINAL COORDINATES
@@ -59,8 +82,8 @@ class Piece:
             if self.color == "BLACK":
                 m *= -1
             new_position = position.add_move(m)
-        if validate_coordinates(new_position):
-            return_moves["moves"].append(new_position)
+            if validate_coordinates(new_position):
+                return_moves["moves"].append(new_position)
         for c in moves["captures"]:
             #CREATE A COPY OF THE ORIGINAL COORDINATES
             #ADD THE X/Y VALUES OF A CAPTURE VECTOR TO THAT COORDINATE
@@ -68,7 +91,12 @@ class Piece:
             if validate_coordinates(new_position):
                 return_moves["captures"].append(new_position)
             return return_moves
-    
+    def validate_move(self, destination):
+        #CHECK THAT A MOVE IS VALID BY MAKING SURE THAT THE DESTINATION IS VALID AND EMPTY
+        pass
+    def validate_capture(self, destination):
+        #CHECK THAT A CAPTURE IS VALID BY MAKING SURE THAT THE DESTINATION IS VALID AND OCCUPIED BY A PIECE OF THE OPPOSITE COLOR
+        pass
         
 
 class Spot:
@@ -115,16 +143,16 @@ class Board:
         return self.state[y][x]
     def setup_board(self):
         #PLACES ALL THE PIECES IN THEIR STARTING POSITION
-        self.set_spot(0,0,Piece("WHITE","ROOK"))
-        self.set_spot(7,0,Piece("WHITE","ROOK"))
-        self.set_spot(1,0,Piece("WHITE","KNIGHT"))
-        self.set_spot(6,0,Piece("WHITE","KNIGHT"))
-        self.set_spot(2,0,Piece("WHITE","BISHOP"))
-        self.set_spot(5,0,Piece("WHITE","BISHOP"))
-        self.set_spot(3,0,Piece("WHITE","KING"))
-        self.set_spot(4,0,Piece("WHITE","QUEEN"))
+        self.set_spot(0,0,Piece(self, "WHITE","ROOK"))
+        self.set_spot(7,0,Piece(self, "WHITE","ROOK"))
+        self.set_spot(1,0,Piece(self, "WHITE","KNIGHT"))
+        self.set_spot(6,0,Piece(self, "WHITE","KNIGHT"))
+        self.set_spot(2,0,Piece(self, "WHITE","BISHOP"))
+        self.set_spot(5,0,Piece(self, "WHITE","BISHOP"))
+        self.set_spot(3,0,Piece(self, "WHITE","KING"))
+        self.set_spot(4,0,Piece(self, "WHITE","QUEEN"))
         for i in range(0,8):
-            self.set_spot(i,1,Piece("WHITE","PAWN"))
+            self.set_spot(i,1,Piece(self, "WHITE","PAWN"))
         return self
     def print_board(self):
         #PRINTS THE BOARD TO THE TERMINAL USING ASCII CHARACTERS
@@ -140,6 +168,9 @@ class Board:
         #RETURNS THE SPOT ON THE BOARD SPECIFIED BY A GIVEN POSITION IN CHESS NOTATION
         coordinate = self.translate_position(position)
         return self.get_spot(coordinate[0], coordinate[1])
+    def get_spot_by_position(self, position):
+        #RETURNS THE SPOT ON THE BOARD SPECIFIED BY A POSITION OBJECT 
+        return self.get_spot(position.vector[0], position.vector[1])
     def translate_position(self, position):
         #TAKES A GIVEN CHESS POSITION IN THE FORMAT "E7" AND CONVERTS IT
         #TO XY COORDINATES THAT CAN BE USED TO ACCESS THAT SPOT
@@ -157,28 +188,70 @@ class Board:
         end_spot.occupy(start_spot.occupant)
         start_spot.empty()
         pass
-
+    def check(self):
+        #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECK
+        #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS THE OTHER PLAYER IN CHECK
+        pass
+    def checkmate(self):
+        #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECKMATE
+        #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS CHECKMATE/THE WINNER
+        pass
+    def possible_selections(self, color):
+        #RETURN AN ARRAY OF POSITIONS THAT ARE OCCUPIED BY A GIVEN SIDE
+        possibilities = []
+        for y in range(0,8):
+            for x in range(0,8):
+                current_spot = self.get_spot_by_position(Position([x,y]))
+                if current_spot and current_spot.state == "FULL":
+                    if current_spot.occupant.color == color:
+                        possibilities.append(Position([x,y]))
+        return possibilities
+                
 def take_turn(board, side):
     #TAKES IN A BOARD WITH THE CURRENT STATE OF A CHESS GAME
     #AND THE SIDE TO GO AS A BOOL (TRUE = BLACK, FALSE = WHITE)
     #GETS COMMAND (EX. MOVE E7 E5) USING GET_STRING() OR GET_INPUT()
     #USES SPLIT() TO BREAK THE COMMAND INTO THE NAME OF THE BOARD METHOD
     #TO BE CALLED AND THE ARGUMENTS/PARAMETERS FOR THAT FUNCTION CALL
-    command = raw_input('%s: WHAT IS YOUR COMMAND?' % side)
+    board.print_board()
+    command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
     command_array = command.split()
     if command_array[0] == "MOVE":
-        board.move()
-    
+        board.move(command_array[1], command_array[2])
+    board.print_board()
+    if command_array[0] == "PIECES":
+        for i in board.possible_selections(side):
+            print (i.chess_notation)
+
 board = Board()
-board.setup_board()
-board.print_board()
-print(board.translate_position("E7"))
-print(board.get_position("E7").get_ascii())
-board.move("H7", "H4")
-board.print_board()
-position = Position("H4")
+def play_game(board):
+    #FUNCTION TO INITIATE AND CARRY A GAME TO COMPLETION
+    
+    #SETUP THE CHESS BOARD WITH THE STARTING POSITION OF ALL THE PIECES
+    board.setup_board()
+    #PRINT THE STATE OF THE CHESS BOARD
+    board.print_board()
+    #SET A COUNTER FOR THE TURNS
+    turn_counter = 0
+    #UNTIL WE REACH CHECKMATE
+    while not (board.checkmate()):
+        #TAKE THE TURN OF EACH PLAYER
+        if turn_counter % 2:
+            #ON ODD TURNS, BLACK GOES
+            take_turn(board, "BLACK")
+        else:
+            #ON EVEN TURNS, WHITE GOES
+            take_turn(board, "WHITE")
+        turn_counter += 1
+#board.setup_board()
+#print(board.translate_position("E7"))
+#print(board.get_position("G8").get_ascii())
+#board.move("H7", "H4")
+#board.print_board()
+#position = Position("H4")
 #moves = piece_moves.eval_moves(position, piece_moves.pawn_moves())
 #print(moves)
-moves = board.get_position("E7").occupant.eval_moves(Position("E7"))
-for m in moves["moves"]:
-    m.print()
+#moves = board.get_position("G8").occupant.eval_moves(Position("G8"))
+#for m in moves["moves"]:
+#    m.print()
+play_game(board)

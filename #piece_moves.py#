@@ -37,7 +37,7 @@ def bishop_moves():
         captures.append(numpy.array([-i,i]))
         captures.append(numpy.array([i,-i]))
         captures.append(numpy.array([-i,-i]))
-    return {"moves":moves, "captures":captures}
+    return {"moves":moves, "captures":captures
 
 def knight_moves():
     #GENERATE AND RETURN VECTORS THAT REPRESENT WHERE A KNIGHT CAN MOVE AND OR CAPTURE RELATIVE TO ITS CURRENT POSITION
