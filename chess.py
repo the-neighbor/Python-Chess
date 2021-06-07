@@ -143,6 +143,7 @@ class Board:
         return self.state[y][x]
     def setup_board(self):
         #PLACES ALL THE PIECES IN THEIR STARTING POSITION
+        #FIRST PLACE THE WHITE PIECES
         self.set_spot(0,0,Piece(self, "WHITE","ROOK"))
         self.set_spot(7,0,Piece(self, "WHITE","ROOK"))
         self.set_spot(1,0,Piece(self, "WHITE","KNIGHT"))
@@ -153,15 +154,35 @@ class Board:
         self.set_spot(4,0,Piece(self, "WHITE","QUEEN"))
         for i in range(0,8):
             self.set_spot(i,1,Piece(self, "WHITE","PAWN"))
+        self.set_spot(0,7,Piece(self, "BLACK","ROOK"))
+        self.set_spot(7,7,Piece(self, "BLACK","ROOK"))
+        self.set_spot(1,7,Piece(self, "BLACK","KNIGHT"))
+        self.set_spot(6,7,Piece(self, "BLACK","KNIGHT"))
+        self.set_spot(2,7,Piece(self, "BLACK","BISHOP"))
+        self.set_spot(5,7,Piece(self, "BLACK","BISHOP"))
+        self.set_spot(3,7,Piece(self, "BLACK","KING"))
+        self.set_spot(4,7,Piece(self, "BLACK","QUEEN"))
+        for i in range(0,8):
+            self.set_spot(i,6,Piece(self, "BLACK","PAWN"))
         return self
     def print_board(self):
         #PRINTS THE BOARD TO THE TERMINAL USING ASCII CHARACTERS
-        board_str = ""
+        board_str = "  "
+        XVALUES = list("ABCDEFGH")
+        YVALUES = list("87654321")
+        index = 0
+        for c in XVALUES:
+            board_str += (c)
+            board_str += "  "
+        board_str += "\n"
         for y in self.state:
+            board_str += (YVALUES[index])
+            board_str += " "
             for x in y:
                 board_str += x.get_ascii()
                 board_str += " "
             board_str += '\n'
+            index += 1
         board_str += '\n'
         print(board_str)    
     def get_position(self, position):
@@ -206,6 +227,15 @@ class Board:
                     if current_spot.occupant.color == color:
                         possibilities.append(Position([x,y]))
         return possibilities
+    def possible_moves(self, position):
+        #PASSED IN A POSITION AS A PARAMETER, RETURN THE LIST OF POSSIBLE MOVES
+        #THAT CAN BE MADE WITH THE PIECE ON THAT POSITION
+        spot = self.get_spot_by_position(position)
+        if spot and spot.state == "FULL":
+            moves = spot.occupant.eval_moves(position)
+            return moves
+        
+        
                 
 def take_turn(board, side):
     #TAKES IN A BOARD WITH THE CURRENT STATE OF A CHESS GAME
@@ -217,11 +247,33 @@ def take_turn(board, side):
     command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
     command_array = command.split()
     if command_array[0] == "MOVE":
+        #COMMAND TO HANDLE MOVING A PIECE FROM ONE TILE TO ANOTHER
         board.move(command_array[1], command_array[2])
-    board.print_board()
+        #TO ADD:
+        #ADD VALIDATION TO CHECK AND MAKE SURE THAT THE MOVE IS VALID BEFORE EXECUTING
+        #DO THIS BY USING THE BOARD'S POSSIBLE MOVES METHOD.
+        #CHECK THAT THE THIRD ARGUMENT, THE TARGET
+        #IS IN THE MOVES ELEMENT OF THE DICT RETURNED BY CALLING POSSIBLE_MOVES()
+        #ON THE SECOND ARGUMENT, THE PIECE THE PLAYER WANTS TO MOVE.
+        #TARGET MUST ALSO BE EMPTY
+    if command_array[0] == "CAPTURE":
+        #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
+        #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
+        #TO CAPTURE
     if command_array[0] == "PIECES":
         for i in board.possible_selections(side):
             print (i.chess_notation)
+    if command_array[0] == "LISTMOVES":
+        #USE THE NEXT ARGUMENT AS THE LOCATION OF THE PIECE WE WANT TO LIST THE MOVES FOR
+        moves = board.possible_moves(Position(command_array[1]))
+        if moves:
+            print ("MOVES: ")
+            for m in moves['moves']:
+                print (m.chess_notation)
+            print ("CAPTURES: ")
+            for c in moves['captures']:
+                print (c.chess_notation)
+                
 
 board = Board()
 def play_game(board):
