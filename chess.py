@@ -88,16 +88,10 @@ class Piece:
             #CREATE A COPY OF THE ORIGINAL COORDINATES
             #ADD THE X/Y VALUES OF A CAPTURE VECTOR TO THAT COORDINATE
             new_position = position.add_move(c)
+            print (new_position.chess_notation)
             if validate_coordinates(new_position):
                 return_moves["captures"].append(new_position)
-            return return_moves
-    def validate_move(self, destination):
-        #CHECK THAT A MOVE IS VALID BY MAKING SURE THAT THE DESTINATION IS VALID AND EMPTY
-        pass
-    def validate_capture(self, destination):
-        #CHECK THAT A CAPTURE IS VALID BY MAKING SURE THAT THE DESTINATION IS VALID AND OCCUPIED BY A PIECE OF THE OPPOSITE COLOR
-        pass
-        
+        return return_moves
 
 class Spot:
     def __init__(self):
@@ -209,6 +203,9 @@ class Board:
         end_spot.occupy(start_spot.occupant)
         start_spot.empty()
         pass
+    def capture(self, start, end):
+        #MOVES, BUT ALSO ADDS THE CAPTURED PIECE TO A LIST
+        self.move(start, end)
     def check(self):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECK
         #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS THE OTHER PLAYER IN CHECK
@@ -234,9 +231,39 @@ class Board:
         if spot and spot.state == "FULL":
             moves = spot.occupant.eval_moves(position)
             return moves
-        
-        
-                
+    def valid_position(self, position):
+        return validate_coordinates(position)
+    def validate_move(self, side, origin, destination):
+        #CHECK THAT A MOVE IS VALID BY MAKING SURE THAT THE FOLLOWING CONDITIONS ARE MET:
+        #THAT THE ORIGIN AND DESTINATION ARE BOTH VALID BOARD POSITIONS
+        #THAT THE ORIGIN IS OCCUPIED BY A PIECE WHOSE COLOR == SIDE
+        #THAT THE DESTINATION IS EMPTY
+        origin = Position(origin)
+        destination = Position(destination)
+        if side and self.valid_position(origin) and self.valid_position(destination):
+            origin_spot = self.get_spot_by_position(origin)
+            destination_spot = self.get_spot_by_position(destination)
+            if origin_spot.state == "FULL" and \
+               origin_spot.occupant.color == side and \
+               destination_spot.state == "EMPTY":
+                if any(destination.chess_notation == d.chess_notation for d in self.possible_moves(origin)["moves"]):
+                    return True
+        return False
+    def validate_capture(self, side, origin, destination):
+        #CHECK THAT A CAPTURE IS VALID BY MAKING SURE THAT THE DESTINATION IS VALID AND OCCUPIED BY A PIECE OF THE OPPOSITE COLOR
+        origin = Position(origin)
+        destination = Position(destination)
+        if side and self.valid_position(origin) and self.valid_position(destination):
+            origin_spot = self.get_spot_by_position(origin)
+            destination_spot = self.get_spot_by_position(destination)
+            if origin_spot.state == "FULL" and \
+               origin_spot.occupant.color == side and \
+               destination_spot.state == "FULL" and \
+               destination_spot.occupant.color != side:
+                if any(destination.chess_notation == d.chess_notation for d in self.possible_moves(origin)["captures"]):
+                    return True
+        return False
+
 def take_turn(board, side):
     #TAKES IN A BOARD WITH THE CURRENT STATE OF A CHESS GAME
     #AND THE SIDE TO GO AS A BOOL (TRUE = BLACK, FALSE = WHITE)
@@ -244,36 +271,50 @@ def take_turn(board, side):
     #USES SPLIT() TO BREAK THE COMMAND INTO THE NAME OF THE BOARD METHOD
     #TO BE CALLED AND THE ARGUMENTS/PARAMETERS FOR THAT FUNCTION CALL
     board.print_board()
-    command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
-    command_array = command.split()
-    if command_array[0] == "MOVE":
-        #COMMAND TO HANDLE MOVING A PIECE FROM ONE TILE TO ANOTHER
-        board.move(command_array[1], command_array[2])
-        #TO ADD:
-        #ADD VALIDATION TO CHECK AND MAKE SURE THAT THE MOVE IS VALID BEFORE EXECUTING
-        #DO THIS BY USING THE BOARD'S POSSIBLE MOVES METHOD.
-        #CHECK THAT THE THIRD ARGUMENT, THE TARGET
-        #IS IN THE MOVES ELEMENT OF THE DICT RETURNED BY CALLING POSSIBLE_MOVES()
-        #ON THE SECOND ARGUMENT, THE PIECE THE PLAYER WANTS TO MOVE.
-        #TARGET MUST ALSO BE EMPTY
-    if command_array[0] == "CAPTURE":
-        #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
-        #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
-        #TO CAPTURE
-    if command_array[0] == "PIECES":
-        for i in board.possible_selections(side):
-            print (i.chess_notation)
-    if command_array[0] == "LISTMOVES":
-        #USE THE NEXT ARGUMENT AS THE LOCATION OF THE PIECE WE WANT TO LIST THE MOVES FOR
-        moves = board.possible_moves(Position(command_array[1]))
-        if moves:
-            print ("MOVES: ")
-            for m in moves['moves']:
-                print (m.chess_notation)
-            print ("CAPTURES: ")
-            for c in moves['captures']:
-                print (c.chess_notation)
-                
+    #BOOL SO WE KNOW WHEN THE TURN IS OVER
+    turn_complete = False
+    #UNTIL THE TURN IS COMPLETE, PROMPT FOR INPUT
+    while not turn_complete:
+        #PROMPT USER FOR INPUT
+        command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
+        #SPLIT INPUT INTO COMMAND AND PARAMETERS
+        command_array = command.split()
+        if command_array[0] == "MOVE":
+            #COMMAND TO HANDLE MOVING A PIECE FROM ONE TILE TO ANOTHER
+            if board.validate_move(side, command_array[1], command_array[2]):
+                board.move(command_array[1], command_array[2])
+                turn_complete = True
+            else:
+                print("Error")
+            #TO ADD:
+            #ADD VALIDATION TO CHECK AND MAKE SURE THAT THE MOVE IS VALID BEFORE EXECUTING
+            #DO THIS BY USING THE BOARD'S POSSIBLE MOVES METHOD.
+            #CHECK THAT THE THIRD ARGUMENT, THE TARGET
+            #IS IN THE MOVES ELEMENT OF THE DICT RETURNED BY CALLING POSSIBLE_MOVES()
+            #ON THE SECOND ARGUMENT, THE PIECE THE PLAYER WANTS TO MOVE.
+            #TARGET MUST ALSO BE EMPTY
+        if command_array[0] == "CAPTURE":
+                #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
+                #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
+                #TO CAPTURE
+            if board.validate_capture(side, command_array[1], command_array[2]):
+                board.capture(command_array[1], command_array[2])
+                turn_complete = True
+            else:
+                print ("Error")
+        if command_array[0] == "PIECES":
+            for i in board.possible_selections(side):
+                print (i.chess_notation)
+        if command_array[0] == "LISTMOVES":
+            #USE THE NEXT ARGUMENT AS THE LOCATION OF THE PIECE WE WANT TO LIST THE MOVES FOR
+            moves = board.possible_moves(Position(command_array[1]))
+            if moves:
+                print ("MOVES: ")
+                for m in moves['moves']:
+                    print (m.chess_notation)
+                print ("CAPTURES: ")
+                for c in moves['captures']:
+                    print (c.chess_notation)
 
 board = Board()
 def play_game(board):
