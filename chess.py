@@ -2,6 +2,7 @@ import numpy
 import piece_moves
 
 validate_coordinates = piece_moves.validate_coordinates
+cast_ray = piece_moves.cast_ray
 
 #POSITION CLASS STORES A GIVEN POSITION ON THE CHESS BOARD
 #WHEN INITIALIZED, IT TAKES IN A POSITION AS EITHER A PAIR OF COORDINATES
@@ -63,6 +64,8 @@ class Piece:
         self.board = board
         self.color = color
         self.piece = piece
+        self.move_counter = 0
+        self.capture_counter = 0
         self.piece_moves = piece_moves.move_methods[self.piece]
     def piece_ascii(self):
         piece_str = ""
@@ -73,7 +76,7 @@ class Piece:
         return self.ascii[self.piece]
     def eval_moves(self, position):
         #REFACTOR THE EVAL
-        moves = self.piece_moves()
+        moves = self.piece_moves(self, self.board, position)
         print(moves)
         return_moves = {"moves":[], "captures":[]}
         for m in moves["moves"]:
@@ -201,11 +204,13 @@ class Board:
         start_spot = self.get_position(start)
         end_spot = self.get_position(end)
         end_spot.occupy(start_spot.occupant)
+        end_spot.occupant.move_counter += 1
         start_spot.empty()
         pass
     def capture(self, start, end):
         #MOVES, BUT ALSO ADDS THE CAPTURED PIECE TO A LIST
         self.move(start, end)
+        end_spot.occupant.capture_counter += 1
     def check(self):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECK
         #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS THE OTHER PLAYER IN CHECK
@@ -347,4 +352,9 @@ def play_game(board):
 #moves = board.get_position("G8").occupant.eval_moves(Position("G8"))
 #for m in moves["moves"]:
 #    m.print()
+
+board.setup_board()
+
+
 play_game(board)
+
