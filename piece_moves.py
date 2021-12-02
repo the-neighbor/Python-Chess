@@ -75,8 +75,8 @@ def queen_moves(piece,board,position):
 def king_moves(piece,board,position):
     #GENERATE AND RETURN VECTORS THAT REPRESENT WHERE A KING CAN MOVE AND OR CAPTURE RELATIVE TO ITS CURRENT POSITION
     #EVERY COMBINATION OF 0,1, AND -1 EXCEPT 0,0
-    moves = []
-    captures = []
+    moves = [[1,0],[-1,0],[0,-1],[0,1],[1,1],[1,-1],[-1,-1],[-1,1]]
+    captures = [[1,0],[-1,0],[0,-1],[0,1],[1,1],[1,-1],[-1,-1],[-1,1]]
     return {"moves":moves, "captures":captures}
 
 def validate_coordinates(position):

@@ -1,5 +1,6 @@
 import numpy
 import piece_moves
+import copy
 
 validate_coordinates = piece_moves.validate_coordinates
 cast_ray = piece_moves.cast_ray
@@ -37,7 +38,7 @@ class Position:
     def print(self):
         #PRINT BOTH FORMS OF THE NOTATION TO STDOUT
         print(self.chess_notation)
-        print(self.vector)
+        #print(self.vector)
     def add_move(self, movement_vector):
         #USE THE VECTOR ADDITION PROVIDED BY NUMPY TO RETURN THE POSITION
         #YOU WOULD ARRIVE AT IF YOU FOLLOWED SOME MOVEMENT VECTOR FROM THIS ONE.
@@ -77,12 +78,12 @@ class Piece:
     def eval_moves(self, position):
         #REFACTOR THE EVAL
         moves = self.piece_moves(self, self.board, position)
-        print(moves)
+        #print(moves)
         return_moves = {"moves":[], "captures":[]}
         for m in moves["moves"]:
             #CREATE A COPY OF THE ORIGINAL COORDINATES
             #ADD THE X/Y VALUES OF A MOVE VECTOR TO THAT COORDINATE
-            if self.color == "BLACK":
+            if self.color == "BLACK" and self.piece == "PAWN":
                 m *= -1
             new_position = position.add_move(m)
             if validate_coordinates(new_position):
@@ -90,8 +91,10 @@ class Piece:
         for c in moves["captures"]:
             #CREATE A COPY OF THE ORIGINAL COORDINATES
             #ADD THE X/Y VALUES OF A CAPTURE VECTOR TO THAT COORDINATE
+            if self.color == "BLACK" and self.piece == "PAWN":
+                c *= -1
             new_position = position.add_move(c)
-            print (new_position.chess_notation)
+            #print (new_position.chess_notation)
             if validate_coordinates(new_position):
                 return_moves["captures"].append(new_position)
         return return_moves
@@ -207,14 +210,26 @@ class Board:
         end_spot.occupant.move_counter += 1
         start_spot.empty()
         pass
+    def look_ahead(self, start, end):
+        board_state = copy.deepcopy(self)
+        board_state.move(start, end)
+        return board_state
     def capture(self, start, end):
         #MOVES, BUT ALSO ADDS THE CAPTURED PIECE TO A LIST
         self.move(start, end)
         end_spot.occupant.capture_counter += 1
-    def check(self):
+    def check(self, color):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECK
         #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS THE OTHER PLAYER IN CHECK
-        pass
+        check = False
+        potential_captures = self.possible_captures(color)
+        for c in potential_captures:
+            print(c)
+            spot = self.get_spot_by_position(c)
+            if spot and spot.state == "FULL" :
+                if spot.occupant.color != color and spot.occupant.piece == "KING":
+                    check = True
+        return check
     def checkmate(self):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECKMATE
         #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS CHECKMATE/THE WINNER
@@ -236,6 +251,19 @@ class Board:
         if spot and spot.state == "FULL":
             moves = spot.occupant.eval_moves(position)
             return moves
+    def possible_captures(self, color):
+        #get possible captures
+        movable_pieces = self.possible_selections(color)
+        possibilities = []
+        for p in movable_pieces:
+            #p.print()
+            current_piece_moves = self.possible_moves(p)
+            for m in current_piece_moves['captures']:
+                #m.print()
+                if self.validate_capture(color,p.chess_notation,m.chess_notation):
+                    m.print()
+                    possibilities.append(m)
+        return possibilities
     def valid_position(self, position):
         return validate_coordinates(position)
     def validate_move(self, side, origin, destination):
@@ -281,6 +309,7 @@ def take_turn(board, side):
     #UNTIL THE TURN IS COMPLETE, PROMPT FOR INPUT
     while not turn_complete:
         #PROMPT USER FOR INPUT
+        print("CHECK?\nBLACK:%s WHITE:%s" % (str(board.check('BLACK')),str(board.check('WHITE'))))
         command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
         #SPLIT INPUT INTO COMMAND AND PARAMETERS
         command_array = command.split()
@@ -319,7 +348,8 @@ def take_turn(board, side):
                     print (m.chess_notation)
                 print ("CAPTURES: ")
                 for c in moves['captures']:
-                    print (c.chess_notation)
+                    if board.validate_capture(side, command_array[1], c.chess_notation):
+                        print (c.chess_notation)
 
 board = Board()
 def play_game(board):
