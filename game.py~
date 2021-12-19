@@ -1,0 +1,4 @@
+def import * from chess.py
+
+def board_to_list(board: Board):
+    
