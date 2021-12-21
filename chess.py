@@ -235,6 +235,7 @@ class Board:
     def checkmate(self):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECKMATE
         #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS CHECKMATE/THE WINNER
+        frontier = []
         pass
     def possible_selections(self, color):
         #RETURN AN ARRAY OF POSITIONS THAT ARE OCCUPIED BY A GIVEN SIDE
@@ -253,6 +254,19 @@ class Board:
         if spot and spot.state == "FULL":
             moves = spot.occupant.eval_moves(position)
             return moves
+    def valid_moves(self, position):
+        #RETURNS A DICTIONARY LIKE POSSIBLE MOVES BUT WITH THE MOVES AND CAPTURES PRE VALIDATED
+        moves = self.possible_moves(position)
+        valids = {'moves':[], 'captures':[]}
+        spot = self.get_spot_by_position(position)
+        piece = spot.occupant
+        for m in moves['moves']:
+            if self.validate_move(piece.color, position.chess_notation, m.chess_notation):
+                valids['moves'].append(m)
+        for c in moves['captures']:
+            if self.validate_capture(piece.color, position.chess_notation, c.chess_notation):
+                valids['captures'].append(c)
+        return valids
     def possible_captures(self, color):
         #get possible captures
         movable_pieces = self.possible_selections(color)
@@ -266,6 +280,29 @@ class Board:
                     m.print()
                     possibilities.append(m)
         return possibilities
+    def all_possible_moves(self, color):
+        #MAY BE REDUNDANT WITH THE VALID MOVES FUNCTIONS
+        possibilities = []
+        for piece_position in self.possible_selections(color):
+            for target_position in self.possible_moves(piece_position):
+                possibilities.append([piece_position, target_position])
+        return possibilities
+    def all_possible_captures(self, color):
+        #MAY BE REDUNDANT NOW WITH THE VALID MOVES FUNCTION
+        possibilities = []
+        for piece_position in self.possible_selections(color):
+            for target_position in self.possible_captures(piece_position):
+                possibilities.append([piece_position, target_position])
+        return possibilities
+    def all_valid_moves(self, color):
+        all_valids = []
+        for piece_position in self.possible_selections(color):
+            current_valids = self.valid_moves(piece_position)
+            for target_position in current_valids['moves']:
+                all_valids.append([piece_position, target_position])
+            for target_position in current_valids['captures']:
+                all_valids.append([piece_position, target_position])
+        return all_valids
     def valid_position(self, position):
         return validate_coordinates(position)
     def validate_move(self, side, origin, destination):
@@ -392,6 +429,10 @@ class Game:
                 self.save(command_array[1])
             if command_array[0] == "LOAD":
                 self.load(command_array[1])
+            if command_array[0] == "ALLVALIDS" and len(command_array) == 2:
+                allvalids = self.board.all_valid_moves(command_array[1])
+                for i in allvalids:
+                    print(i[0].chess_notation, i[1].chess_notation)
     def get_dict(self) -> dict:
         game_dict = {}
         game_dict['board'] = self.board.get_list()
