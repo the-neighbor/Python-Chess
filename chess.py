@@ -219,6 +219,7 @@ class Board:
     def capture(self, start, end):
         #MOVES, BUT ALSO ADDS THE CAPTURED PIECE TO A LIST
         self.move(start, end)
+        end_spot = self.get_position(end)
         end_spot.occupant.capture_counter += 1
     def check(self, color):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECK
@@ -226,17 +227,25 @@ class Board:
         check = False
         potential_captures = self.possible_captures(color)
         for c in potential_captures:
-            print(c)
+            #print(c)
             spot = self.get_spot_by_position(c)
             if spot and spot.state == "FULL" :
                 if spot.occupant.color != color and spot.occupant.piece == "KING":
                     check = True
         return check
-    def checkmate(self):
+    def checkmate(self, color):
         #EVAL THE CURRENT STATE OF THE BOARD TO DETERMINE IF EITHER PLAYER HAS CHECKMATE
         #IF NOT, RETURN FALSE, IF SO, RETURN THE PLAYER WHO HAS CHECKMATE/THE WINNER
-        frontier = []
-        pass
+        opposing_color = "WHITE"
+        if color == "WHITE":
+            opposing_color = "BLACK"
+        for move in self.all_valid_moves(opposing_color):
+            future = self.look_ahead(move[0].chess_notation, move[1].chess_notation)
+            #future.print_board()
+            if not (future.check(color)):
+                #print(move[0].chess_notation, move[1].chess_notation)
+                return False
+        return True
     def possible_selections(self, color):
         #RETURN AN ARRAY OF POSITIONS THAT ARE OCCUPIED BY A GIVEN SIDE
         possibilities = []
@@ -267,6 +276,21 @@ class Board:
             if self.validate_capture(piece.color, position.chess_notation, c.chess_notation):
                 valids['captures'].append(c)
         return valids
+    def spots_threatened(self, color):
+        #GET ALL THE SPOTS CURRENTLY ON THE BOARD THAT ARE THREATENED BY A GIVEN COLOR
+        movable_pieces = self.possible_selections(color)
+        possibilities = []
+        for p in movable_pieces:
+            current_piece_moves = self.possible_moves(p)
+            for m in current_piece_moves['captures']:
+                spot = self.get_spot_by_position(m)
+                if spot.state == "EMPTY" or spot.occupant.color != color:
+                    possibilities.append(m)
+        return possibilities
+    def spots_occupied(self, color):
+        return self.possible_selections(color)
+    def spots_controlled(self, color):
+        return [*self.spots_occupied(color),*self.spots_threatened(color)]
     def possible_captures(self, color):
         #get possible captures
         movable_pieces = self.possible_selections(color)
@@ -277,7 +301,7 @@ class Board:
             for m in current_piece_moves['captures']:
                 #m.print()
                 if self.validate_capture(color,p.chess_notation,m.chess_notation):
-                    m.print()
+                    #m.print()
                     possibilities.append(m)
         return possibilities
     def all_possible_moves(self, color):
@@ -360,7 +384,7 @@ class Game:
         #SET A COUNTER FOR THE TURNS
         self.turn = 0
         #UNTIL WE REACH CHECKMATE
-        while not (self.board.checkmate()):
+        while not (self.board.checkmate("BLACK") or self.board.checkmate("WHITE")):
             #TAKE THE TURN OF EACH PLAYER
             if self.turn % 2:
                 #ON ODD TURNS, BLACK GOES
@@ -369,7 +393,14 @@ class Game:
                 #ON EVEN TURNS, WHITE GOES
                 self.take_turn("WHITE")
             self.turn += 1
-
+        self.win_message()
+    def win_message(self):
+        for color in ["BLACK", "WHITE"]:
+            if self.board.checkmate(color):
+                winner = color
+        message = f"CONGRATULATIONS {winner}, YOU WIN!\nFINAL SCORE: {self.score(self.board, winner)}"
+        self.board.print_board()
+        print(message)
     def take_turn(self, side):
     #TAKES IN A BOARD WITH THE CURRENT STATE OF A CHESS GAME
     #AND THE SIDE TO GO AS A BOOL (TRUE = BLACK, FALSE = WHITE)
@@ -433,6 +464,13 @@ class Game:
                 allvalids = self.board.all_valid_moves(command_array[1])
                 for i in allvalids:
                     print(i[0].chess_notation, i[1].chess_notation)
+            if command_array[0] == "CHECKMATE" and len(command_array) == 2:
+                print ("DOES" + command_array[1] + "CHECKMATE?")
+                print (self.board.checkmate(command_array[1]))
+            if command_array[0] == "SCORE" and len(command_array) == 2:
+                print (command_array[1] + "'S SCORE: " + str(self.score(self.board, command_array[1])))
+            if command_array[0] == "AI" and len(command_array) == 2:
+                print (command_array[1] + "'S AI DECISION: " + self.ai(command_array[1]))
     def get_dict(self) -> dict:
         game_dict = {}
         game_dict['board'] = self.board.get_list()
@@ -471,7 +509,34 @@ class Game:
         self.load_board_from_data(game_data['board'])
         self.board.print_board()
         pass
-
+    def score(self, board, color: str):
+        player_score = 0
+        player_score += len(board.spots_occupied(color))
+        player_score += len(board.spots_threatened(color)) * 4
+        if board.check(color):
+            player_score *= 2
+        if board.checkmate(color):
+            player_score *= 10
+        return player_score
+    def ai(self, color: str) -> str:
+        #MAKES A DECISION FOR THE TURN BASED ON THE COLOR AND THE score
+        highest_score = 0
+        highest_command = ""
+        for piece in self.board.possible_selections(color):
+            moves = self.board.valid_moves(piece)
+            for move in moves['moves']:
+                hypothetical = self.board.look_ahead(piece.chess_notation, move.chess_notation)
+                current_score = self.score(hypothetical, color)
+                if current_score >= highest_score:
+                    highest_score = current_score
+                    highest_command = "MOVE " + piece.chess_notation + " " + move.chess_notation
+            for capture in moves['captures']:
+                hypothetical = self.board.look_ahead(piece.chess_notation, capture.chess_notation)
+                current_score = self.score(hypothetical, color)
+                if current_score >= highest_score:
+                    highest_score = current_score
+                    highest_command = "CAPTURE " + piece.chess_notation + " " + capture.chess_notation
+        return highest_command
 pieces_ascii = {
     'PAWN':"P",
     'ROOK':"R",
