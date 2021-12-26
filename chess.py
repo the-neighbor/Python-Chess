@@ -256,6 +256,14 @@ class Board:
                     if current_spot.occupant.color == color:
                         possibilities.append(Position([x,y]))
         return possibilities
+    def puts_self_in_check(self, color, start, end):
+        opposing_color = "WHITE"
+        if color == "WHITE":
+            opposing_color = "BLACK"
+        future = self.look_ahead(start, end)
+        if future.check(opposing_color):
+            return True
+        return False
     def possible_moves(self, position):
         #PASSED IN A POSITION AS A PARAMETER, RETURN THE LIST OF POSSIBLE MOVES
         #THAT CAN BE MADE WITH THE PIECE ON THAT POSITION
@@ -372,8 +380,34 @@ class Game:
     def __init__(self):
         self.board = Board()
         self.turn = 0
+        self.welcome_message = "WELCOME TO PYTHON CHESS!\n\n\n\n-Made by Olive Daly(github.com/the-neighbor) for Harvard CS50x"
+    def print_commands(self, commands: dict):
+        #PRINT ALL COMMANDS IN A DICTIONARY PASSED IN AS A PARAMETER
+        string = ""
+        for index, (command, data) in enumerate(commands.items()):
+            string += f"{index}. {command}"
+            for p in data['params']:
+                string += f" {p}"
+            string += f"\n\t{data['description']}\n"
+        print(string)
     def start_game(self):
-        pass
+        print(self.welcome_message)
+        print("What would you like to do?")
+        commands = {
+            "PvP":{
+                'params':[],
+                'description':"Starts a new game for two players"
+            },
+            "PvCPU":{
+                'params':["<color>"],
+                'description':"Starts a new game versus the CPU as <color>(BLACK, WHITE)"
+            },
+            "LOAD": {
+                'params':["<filename>"],
+                'description':"Loads a saved game from a file in the game directory called <filename>"
+            }
+        }
+        self.print_commands(commands)
     def play_game(self):
         #FUNCTION TO INITIATE AND CARRY A GAME TO COMPLETION
 
@@ -419,7 +453,8 @@ class Game:
             command_array = command.split()
             if command_array[0] == "MOVE":
                 #COMMAND TO HANDLE MOVING A PIECE FROM ONE TILE TO ANOTHER
-                if self.board.validate_move(side, command_array[1], command_array[2]):
+                if self.board.validate_move(side, command_array[1], command_array[2]) \
+                and not self.board.puts_self_in_check(side, command_array[1], command_array[2]):
                     self.board.move(command_array[1], command_array[2])
                     turn_complete = True
                 else:
@@ -435,7 +470,8 @@ class Game:
                 #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
                 #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
                 #TO CAPTURE
-                if self.board.validate_capture(side, command_array[1], command_array[2]):
+                if self.board.validate_capture(side, command_array[1], command_array[2]) \
+                and not self.board.puts_self_in_check(side, command_array[1], command_array[2]):
                     self.board.capture(command_array[1], command_array[2])
                     turn_complete = True
                 else:
@@ -527,13 +563,19 @@ class Game:
             for move in moves['moves']:
                 hypothetical = self.board.look_ahead(piece.chess_notation, move.chess_notation)
                 current_score = self.score(hypothetical, color)
-                if current_score >= highest_score:
+                opposing_color = "WHITE"
+                if color == "WHITE":
+                    opposing_color = "BLACK"
+                if current_score >= highest_score and not hypothetical.check(opposing_color):
                     highest_score = current_score
                     highest_command = "MOVE " + piece.chess_notation + " " + move.chess_notation
             for capture in moves['captures']:
                 hypothetical = self.board.look_ahead(piece.chess_notation, capture.chess_notation)
                 current_score = self.score(hypothetical, color)
-                if current_score >= highest_score:
+                opposing_color = "WHITE"
+                if color == "WHITE":
+                    opposing_color = "BLACK"
+                if current_score >= highest_score and not hypothetical.check(opposing_color):
                     highest_score = current_score
                     highest_command = "CAPTURE " + piece.chess_notation + " " + capture.chess_notation
         return highest_command
@@ -551,4 +593,5 @@ teams_ascii = {
 }
 
 game = Game()
+game.start_game()
 game.play_game()
