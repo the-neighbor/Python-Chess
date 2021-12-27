@@ -380,6 +380,8 @@ class Game:
     def __init__(self):
         self.board = Board()
         self.turn = 0
+        self.game_mode = ""
+        self.player_color = ""
         self.welcome_message = "WELCOME TO PYTHON CHESS!\n\n\n\n-Made by Olive Daly(github.com/the-neighbor) for Harvard CS50x"
     def print_commands(self, commands: dict):
         #PRINT ALL COMMANDS IN A DICTIONARY PASSED IN AS A PARAMETER
@@ -390,44 +392,167 @@ class Game:
                 string += f" {p}"
             string += f"\n\t{data['description']}\n"
         print(string)
+    def menu(self, commands: dict):
+        #DISPLAYS A LIST OF COMMANDS, GETS A STRING REPRESENTING THE COMMAND AND ARGUMENTS
+        #THEN USES THE COMMAND TO CALL A FUNCTION
+
+        complete = False
+        while not complete:
+            print("Please enter one of the following commands: \n")
+            self.print_commands(commands)
+            command_string = input()
+            command_array = command_string.split(" ")
+            command = command_array[0]
+            params = command_array[slice(1, len(command_array))]
+            if command in commands and len(params) == len(commands[command]['params']):
+                commands[command]['function'](*params)
+                complete = True
     def start_game(self):
         print(self.welcome_message)
         print("What would you like to do?")
         commands = {
             "PvP":{
                 'params':[],
-                'description':"Starts a new game for two players"
+                'description':"Starts a new game for two players",
+                'function':self.play_game
             },
             "PvCPU":{
                 'params':["<color>"],
-                'description':"Starts a new game versus the CPU as <color>(BLACK, WHITE)"
+                'description':"Starts a new game versus the CPU as <color>(BLACK, WHITE)",
+                'function':self.play_vs_ai
             },
             "LOAD": {
                 'params':["<filename>"],
-                'description':"Loads a saved game from a file in the game directory called <filename>"
+                'description':"Loads a saved game from a file in the game directory called <filename>",
+                'function':self.load
             }
         }
-        self.print_commands(commands)
-    def play_game(self):
-        #FUNCTION TO INITIATE AND CARRY A GAME TO COMPLETION
-
-        #SETUP THE CHESS BOARD WITH THE STARTING POSITION OF ALL THE PIECES
+        self.menu(commands)
+    def print_result(self, side: str, command_array: list):
+        #PRINTS THE RESULT OF A PARTICULAR COMMAND
+        recap_string = ""
+        if command_array[0] in ["MOVE","CAPTURE"]:
+            start_position = command_array[1]
+            end_position = command_array[2]
+            recap_string += f"{side} MOVES THEIR PIECE ON {start_position} TO "
+            if command_array[0] == "MOVE":
+                recap_string += end_position
+            else:
+                recap_string += f"CAPTURE {end_position}"
+        print(f"{recap_string}\n")
+    def execute_command(self, side: str, command: str):
+        #TAKES IN A COMMAND LINE STRING AND
+        command_array = command.split()
+        turn_complete = False
+        if command_array[0] == "MOVE":
+            #COMMAND TO HANDLE MOVING A PIECE FROM ONE TILE TO ANOTHER
+            if self.board.validate_move(side, command_array[1], command_array[2]) \
+            and not self.board.puts_self_in_check(side, command_array[1], command_array[2]):
+                self.board.move(command_array[1], command_array[2])
+                turn_complete = True
+            else:
+                print("Error")
+                #TO ADD:
+                #ADD VALIDATION TO CHECK AND MAKE SURE THAT THE MOVE IS VALID BEFORE EXECUTING
+                #DO THIS BY USING THE self.board'S POSSIBLE MOVES METHOD.
+                #CHECK THAT THE THIRD ARGUMENT, THE TARGET
+                #IS IN THE MOVES ELEMENT OF THE DICT RETURNED BY CALLING POSSIBLE_MOVES()
+                #ON THE SECOND ARGUMENT, THE PIECE THE PLAYER WANTS TO MOVE.
+                #TARGET MUST ALSO BE EMPTY
+        if command_array[0] == "CAPTURE":
+            #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
+            #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
+            #TO CAPTURE
+            if self.board.validate_capture(side, command_array[1], command_array[2]) \
+            and not self.board.puts_self_in_check(side, command_array[1], command_array[2]):
+                self.board.capture(command_array[1], command_array[2])
+                turn_complete = True
+            else:
+                print ("Error")
+        if command_array[0] == "PIECES":
+            for i in self.board.possible_selections(side):
+                print (i.chess_notation)
+        if command_array[0] == "LISTMOVES":
+            #USE THE NEXT ARGUMENT AS THE LOCATION OF THE PIECE WE WANT TO LIST THE MOVES FOR
+            moves = self.board.possible_moves(Position(command_array[1]))
+            if moves:
+                print ("MOVES: ")
+                for m in moves['moves']:
+                    print (m.chess_notation)
+                print ("CAPTURES: ")
+                for c in moves['captures']:
+                    if self.board.validate_capture(side, command_array[1], c.chess_notation):
+                        print (c.chess_notation)
+        if command_array[0] == "GETDICT":
+            print(self.get_dict())
+        if command_array[0] == "SAVE":
+            self.save(command_array[1])
+        if command_array[0] == "LOAD":
+            self.load(command_array[1])
+        if command_array[0] == "ALLVALIDS" and len(command_array) == 2:
+            allvalids = self.board.all_valid_moves(command_array[1])
+            for i in allvalids:
+                print(i[0].chess_notation, i[1].chess_notation)
+        if command_array[0] == "CHECKMATE" and len(command_array) == 2:
+            print ("DOES" + command_array[1] + "CHECKMATE?")
+            print (self.board.checkmate(command_array[1]))
+        if command_array[0] == "SCORE" and len(command_array) == 2:
+            print (command_array[1] + "'S SCORE: " + str(self.score(self.board, command_array[1])))
+        if command_array[0] == "AI" and len(command_array) == 2:
+            print (command_array[1] + "'S AI DECISION: " + self.ai(command_array[1]))
+        if turn_complete:
+            self.print_result(side, command_array)
+        return turn_complete
+    def pvcpu_turn(self, color):
+        if self.turn % 2:
+            #ON ODD TURNS, BLACK GOES
+            if color == "BLACK":
+                self.take_turn("BLACK")
+            else:
+                self.execute_command("BLACK", self.ai("BLACK"))
+        else:
+            #ON EVEN TURNS, WHITE GOES
+            if color == "WHITE":
+                self.take_turn("WHITE")
+            else:
+                self.execute_command("WHITE", self.ai("WHITE"))
+    def pvp_turn(self):
+        if self.turn % 2:
+            #ON ODD TURNS, BLACK GOES
+            self.take_turn("BLACK")
+        else:
+            #ON EVEN TURNS, WHITE GOES
+            self.take_turn("WHITE")
+    def game_loop(self):
+        while not (self.board.checkmate("BLACK") or self.board.checkmate("WHITE")):
+            #TAKE THE TURN OF EACH PLAYER
+            if self.game_mode == "PVCPU":
+                self.pvcpu_turn(self.player_color)
+            elif self.game_mode == "PVP":
+                self.pvp_turn()
+            self.turn += 1
+        self.win_message()
+    def play_vs_ai(self, color):
+        #PLAY THE GAME VS THE AI
+        #SETUP BOARD
         self.board.setup_board()
+        self.game_mode = "PVCPU"
         #PRINT THE STATE OF THE CHESS BOARD
         self.board.print_board()
         #SET A COUNTER FOR THE TURNS
         self.turn = 0
         #UNTIL WE REACH CHECKMATE
-        while not (self.board.checkmate("BLACK") or self.board.checkmate("WHITE")):
-            #TAKE THE TURN OF EACH PLAYER
-            if self.turn % 2:
-                #ON ODD TURNS, BLACK GOES
-                self.take_turn("BLACK")
-            else:
-                #ON EVEN TURNS, WHITE GOES
-                self.take_turn("WHITE")
-            self.turn += 1
-        self.win_message()
+    def play_game(self):
+        #FUNCTION TO INITIATE AND CARRY A GAME TO COMPLETION
+        #SETUP THE CHESS BOARD WITH THE STARTING POSITION OF ALL THE PIECES
+        self.board.setup_board()
+        #PRINT THE STATE OF THE CHESS BOARD
+        self.board.print_board()
+        self.game_mode = "PVP"
+        #SET A COUNTER FOR THE TURNS
+        self.turn = 0
+        #UNTIL WE REACH CHECKMATE
+        self.game_loop()
     def win_message(self):
         for color in ["BLACK", "WHITE"]:
             if self.board.checkmate(color):
@@ -449,68 +574,13 @@ class Game:
             #PROMPT USER FOR INPUT
             print("CHECK?\nBLACK:%s WHITE:%s" % (str(self.board.check('BLACK')),str(self.board.check('WHITE'))))
             command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
-            #SPLIT INPUT INTO COMMAND AND PARAMETERS
-            command_array = command.split()
-            if command_array[0] == "MOVE":
-                #COMMAND TO HANDLE MOVING A PIECE FROM ONE TILE TO ANOTHER
-                if self.board.validate_move(side, command_array[1], command_array[2]) \
-                and not self.board.puts_self_in_check(side, command_array[1], command_array[2]):
-                    self.board.move(command_array[1], command_array[2])
-                    turn_complete = True
-                else:
-                    print("Error")
-                    #TO ADD:
-                    #ADD VALIDATION TO CHECK AND MAKE SURE THAT THE MOVE IS VALID BEFORE EXECUTING
-                    #DO THIS BY USING THE self.board'S POSSIBLE MOVES METHOD.
-                    #CHECK THAT THE THIRD ARGUMENT, THE TARGET
-                    #IS IN THE MOVES ELEMENT OF THE DICT RETURNED BY CALLING POSSIBLE_MOVES()
-                    #ON THE SECOND ARGUMENT, THE PIECE THE PLAYER WANTS TO MOVE.
-                    #TARGET MUST ALSO BE EMPTY
-            if command_array[0] == "CAPTURE":
-                #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
-                #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
-                #TO CAPTURE
-                if self.board.validate_capture(side, command_array[1], command_array[2]) \
-                and not self.board.puts_self_in_check(side, command_array[1], command_array[2]):
-                    self.board.capture(command_array[1], command_array[2])
-                    turn_complete = True
-                else:
-                    print ("Error")
-            if command_array[0] == "PIECES":
-                for i in self.board.possible_selections(side):
-                    print (i.chess_notation)
-            if command_array[0] == "LISTMOVES":
-                #USE THE NEXT ARGUMENT AS THE LOCATION OF THE PIECE WE WANT TO LIST THE MOVES FOR
-                moves = self.board.possible_moves(Position(command_array[1]))
-                if moves:
-                    print ("MOVES: ")
-                    for m in moves['moves']:
-                        print (m.chess_notation)
-                    print ("CAPTURES: ")
-                    for c in moves['captures']:
-                        if self.board.validate_capture(side, command_array[1], c.chess_notation):
-                            print (c.chess_notation)
-            if command_array[0] == "GETDICT":
-                print(self.get_dict())
-            if command_array[0] == "SAVE":
-                self.save(command_array[1])
-            if command_array[0] == "LOAD":
-                self.load(command_array[1])
-            if command_array[0] == "ALLVALIDS" and len(command_array) == 2:
-                allvalids = self.board.all_valid_moves(command_array[1])
-                for i in allvalids:
-                    print(i[0].chess_notation, i[1].chess_notation)
-            if command_array[0] == "CHECKMATE" and len(command_array) == 2:
-                print ("DOES" + command_array[1] + "CHECKMATE?")
-                print (self.board.checkmate(command_array[1]))
-            if command_array[0] == "SCORE" and len(command_array) == 2:
-                print (command_array[1] + "'S SCORE: " + str(self.score(self.board, command_array[1])))
-            if command_array[0] == "AI" and len(command_array) == 2:
-                print (command_array[1] + "'S AI DECISION: " + self.ai(command_array[1]))
+            turn_complete = self.execute_command(side, command)
     def get_dict(self) -> dict:
         game_dict = {}
         game_dict['board'] = self.board.get_list()
         game_dict['turn'] = self.turn
+        game_dict['mode'] = self.game_mode
+        game_dice['player_color'] = self.player_color
         return game_dict
     def shorthand_to_piece(self, shorthand: str) -> Piece:
         #TRANSLATE FROM THE ASCII TO A PIECE
@@ -542,9 +612,12 @@ class Game:
         file = open(filename, "r")
         game_data = json.load(file)
         print(game_data)
+        self.turn = game_data['turn']
+        self.game_mode = game_data['mode']
+        self.player_color = game_data['player_color']
         self.load_board_from_data(game_data['board'])
         self.board.print_board()
-        pass
+        self.game_loop()
     def score(self, board, color: str):
         player_score = 0
         player_score += len(board.spots_occupied(color))
@@ -594,4 +667,4 @@ teams_ascii = {
 
 game = Game()
 game.start_game()
-game.play_game()
+
