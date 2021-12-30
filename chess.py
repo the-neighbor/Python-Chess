@@ -304,12 +304,9 @@ class Board:
         movable_pieces = self.possible_selections(color)
         possibilities = []
         for p in movable_pieces:
-            #p.print()
             current_piece_moves = self.possible_moves(p)
             for m in current_piece_moves['captures']:
-                #m.print()
                 if self.validate_capture(color,p.chess_notation,m.chess_notation):
-                    #m.print()
                     possibilities.append(m)
         return possibilities
     def all_possible_moves(self, color):
@@ -382,12 +379,12 @@ class Game:
         self.turn = 0
         self.game_mode = ""
         self.player_color = ""
-        self.welcome_message = "WELCOME TO PYTHON CHESS!\n\n\n\n-Made by Olive Daly(github.com/the-neighbor) for Harvard CS50x"
+        self.welcome_message_path = "assets/title-screen.txt"
     def print_commands(self, commands: dict):
         #PRINT ALL COMMANDS IN A DICTIONARY PASSED IN AS A PARAMETER
         string = ""
         for index, (command, data) in enumerate(commands.items()):
-            string += f"{index}. {command}"
+            string += f"{command}"
             for p in data['params']:
                 string += f" {p}"
             string += f"\n\t{data['description']}\n"
@@ -408,8 +405,11 @@ class Game:
                 commands[command]['function'](*params)
                 complete = True
     def start_game(self):
-        print(self.welcome_message)
-        print("What would you like to do?")
+        welcome_message = ""
+        with open(self.welcome_message_path, 'r') as file:
+            welcome_message = file.read()
+        print(welcome_message)
+        print("What would you like to do?\n\n")
         commands = {
             "PvP":{
                 'params':[],
@@ -420,6 +420,11 @@ class Game:
                 'params':["<color>"],
                 'description':"Starts a new game versus the CPU as <color>(BLACK, WHITE)",
                 'function':self.play_vs_ai
+            },
+            "CPUvCPU":{
+                'params':[],
+                'description':"Starts a game where the CPU/AI plays against itself for your enjoyment!",
+                'function':self.ai_vs_ai
             },
             "LOAD": {
                 'params':["<filename>"],
@@ -440,6 +445,10 @@ class Game:
             else:
                 recap_string += f"CAPTURE {end_position}"
         print(f"{recap_string}\n")
+        if self.board.check("BLACK"):
+            print("BLACK HAS WHITE IN CHECK\n")
+        elif self.board.check("WHITE"):
+            print("WHITE HAS BLACK IN CHECK\n")
     def execute_command(self, side: str, command: str):
         #TAKES IN A COMMAND LINE STRING AND
         command_array = command.split()
@@ -452,13 +461,6 @@ class Game:
                 turn_complete = True
             else:
                 print("Error")
-                #TO ADD:
-                #ADD VALIDATION TO CHECK AND MAKE SURE THAT THE MOVE IS VALID BEFORE EXECUTING
-                #DO THIS BY USING THE self.board'S POSSIBLE MOVES METHOD.
-                #CHECK THAT THE THIRD ARGUMENT, THE TARGET
-                #IS IN THE MOVES ELEMENT OF THE DICT RETURNED BY CALLING POSSIBLE_MOVES()
-                #ON THE SECOND ARGUMENT, THE PIECE THE PLAYER WANTS TO MOVE.
-                #TARGET MUST ALSO BE EMPTY
         if command_array[0] == "CAPTURE":
             #COMMAND TO HANDLE CAPTURING ONE PIECE BY MOVING YOUR OWN PIECE.
             #SIMILAR VALIDATION TO THE MOVE COMMAND, JUST ALSO HAVE TO CHECK THAT THE TILE WE WANT
@@ -472,34 +474,10 @@ class Game:
         if command_array[0] == "PIECES":
             for i in self.board.possible_selections(side):
                 print (i.chess_notation)
-        if command_array[0] == "LISTMOVES":
-            #USE THE NEXT ARGUMENT AS THE LOCATION OF THE PIECE WE WANT TO LIST THE MOVES FOR
-            moves = self.board.possible_moves(Position(command_array[1]))
-            if moves:
-                print ("MOVES: ")
-                for m in moves['moves']:
-                    print (m.chess_notation)
-                print ("CAPTURES: ")
-                for c in moves['captures']:
-                    if self.board.validate_capture(side, command_array[1], c.chess_notation):
-                        print (c.chess_notation)
-        if command_array[0] == "GETDICT":
-            print(self.get_dict())
         if command_array[0] == "SAVE":
             self.save(command_array[1])
         if command_array[0] == "LOAD":
             self.load(command_array[1])
-        if command_array[0] == "ALLVALIDS" and len(command_array) == 2:
-            allvalids = self.board.all_valid_moves(command_array[1])
-            for i in allvalids:
-                print(i[0].chess_notation, i[1].chess_notation)
-        if command_array[0] == "CHECKMATE" and len(command_array) == 2:
-            print ("DOES" + command_array[1] + "CHECKMATE?")
-            print (self.board.checkmate(command_array[1]))
-        if command_array[0] == "SCORE" and len(command_array) == 2:
-            print (command_array[1] + "'S SCORE: " + str(self.score(self.board, command_array[1])))
-        if command_array[0] == "AI" and len(command_array) == 2:
-            print (command_array[1] + "'S AI DECISION: " + self.ai(command_array[1]))
         if turn_complete:
             self.print_result(side, command_array)
         return turn_complete
@@ -526,22 +504,32 @@ class Game:
     def game_loop(self):
         while not (self.board.checkmate("BLACK") or self.board.checkmate("WHITE")):
             #TAKE THE TURN OF EACH PLAYER
-            if self.game_mode == "PVCPU":
+            self.board.print_board()
+            if self.game_mode == "PVCPU" or self.game_mode == "CPUVCPU":
                 self.pvcpu_turn(self.player_color)
             elif self.game_mode == "PVP":
                 self.pvp_turn()
             self.turn += 1
         self.win_message()
+    def ai_vs_ai(self):
+        self.board.setup_board()
+        self.game_mode = "CPUVCPU"
+        #PRINT THE STATE OF THE CHESS BOARD
+        #SET A COUNTER FOR THE TURNS
+        self.turn = 0
+        #UNTIL WE REACH CHECKMATE
+        self.game_loop()
     def play_vs_ai(self, color):
         #PLAY THE GAME VS THE AI
         #SETUP BOARD
         self.board.setup_board()
         self.game_mode = "PVCPU"
+        self.player_color = color 
         #PRINT THE STATE OF THE CHESS BOARD
-        self.board.print_board()
         #SET A COUNTER FOR THE TURNS
         self.turn = 0
         #UNTIL WE REACH CHECKMATE
+        self.game_loop()
     def play_game(self):
         #FUNCTION TO INITIATE AND CARRY A GAME TO COMPLETION
         #SETUP THE CHESS BOARD WITH THE STARTING POSITION OF ALL THE PIECES
@@ -558,7 +546,6 @@ class Game:
             if self.board.checkmate(color):
                 winner = color
         message = f"CONGRATULATIONS {winner}, YOU WIN!\nFINAL SCORE: {self.score(self.board, winner)}"
-        self.board.print_board()
         print(message)
     def take_turn(self, side):
     #TAKES IN A BOARD WITH THE CURRENT STATE OF A CHESS GAME
@@ -566,13 +553,11 @@ class Game:
     #GETS COMMAND (EX. MOVE E7 E5) USING GET_STRING() OR GET_INPUT()
     #USES SPLIT() TO BREAK THE COMMAND INTO THE NAME OF THE BOARD METHOD
     #TO BE CALLED AND THE ARGUMENTS/PARAMETERS FOR THAT FUNCTION CALL
-        self.board.print_board()
         #BOOL SO WE KNOW WHEN THE TURN IS OVER
         turn_complete = False
         #UNTIL THE TURN IS COMPLETE, PROMPT FOR INPUT
         while not turn_complete:
             #PROMPT USER FOR INPUT
-            print("CHECK?\nBLACK:%s WHITE:%s" % (str(self.board.check('BLACK')),str(self.board.check('WHITE'))))
             command = input('%s: WHAT IS YOUR COMMAND?\n' % side)
             turn_complete = self.execute_command(side, command)
     def get_dict(self) -> dict:
@@ -580,7 +565,7 @@ class Game:
         game_dict['board'] = self.board.get_list()
         game_dict['turn'] = self.turn
         game_dict['mode'] = self.game_mode
-        game_dice['player_color'] = self.player_color
+        game_dict['player_color'] = self.player_color
         return game_dict
     def shorthand_to_piece(self, shorthand: str) -> Piece:
         #TRANSLATE FROM THE ASCII TO A PIECE
@@ -611,7 +596,6 @@ class Game:
     def load(self, filename: str):
         file = open(filename, "r")
         game_data = json.load(file)
-        print(game_data)
         self.turn = game_data['turn']
         self.game_mode = game_data['mode']
         self.player_color = game_data['player_color']
@@ -627,6 +611,7 @@ class Game:
         if board.checkmate(color):
             player_score *= 10
         return player_score
+
     def ai(self, color: str) -> str:
         #MAKES A DECISION FOR THE TURN BASED ON THE COLOR AND THE score
         highest_score = 0
@@ -652,6 +637,7 @@ class Game:
                     highest_score = current_score
                     highest_command = "CAPTURE " + piece.chess_notation + " " + capture.chess_notation
         return highest_command
+
 pieces_ascii = {
     'PAWN':"P",
     'ROOK':"R",
